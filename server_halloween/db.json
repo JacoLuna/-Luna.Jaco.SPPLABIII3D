@@ -1,0 +1,29 @@
+{
+  "monstruos": [
+    {
+      "nombre": "vald tepes",
+      "tipo": "Vampiro",
+      "alias": "dracula",
+      "miedo": "100",
+      "defensa": "crucifijo",
+      "materias": [
+        "labo 3",
+        "progra 3",
+        "estadistica"
+      ],
+      "id": 2
+    },
+    {
+      "nombre": "jaco",
+      "tipo": "Esqueleto",
+      "alias": "luna",
+      "miedo": "50",
+      "defensa": "crucifijo",
+      "materias": [
+        "labo 3",
+        "estadistica"
+      ],
+      "id": 3
+    }
+  ]
+}

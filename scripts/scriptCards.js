@@ -1,35 +1,36 @@
 const $cardsDiv = document.getElementById("cardsDiv");
-const $spinner = document.getElementById("spinnerGif");
+const $spinner = document.querySelector("#spinnerGif");
 
 const URLmonstruos = "http://localhost:3000/monstruos";
 
-window.onload = () =>{
+window.onload = () => {
   getMonstruos();
-}
+};
 
-function getMonstruos() {
+async function getMonstruos() {
   $spinner.classList.remove("hide");
-  axios
-    .get(URLmonstruos)
-    .then(({ data }) => {
-      let monstruos = data;
-      if (monstruos.length > 0) {
-        monstruos.forEach((monstruo) => {
-          agregarMonstruo(monstruo);
-        });
-      }
-    })
-    .catch((err) => {
-      console.log(err);
-    })
-    .finally(() => {
-      $spinner.classList.add("hide");
-    });
+  try {
+    const res = await fetch(URLmonstruos);
+    if (!res.ok) {
+      throw Error(res);
+    }
+    const data = await res.json();
+    let monstruos = data;
+    if (monstruos.length > 0) {
+      monstruos.forEach((monstruo) => {
+        agregarMonstruo(monstruo);
+      });
+    }
+  } catch (res) {
+    console.error(`Error ${res.status}: ${res.statusText}`);
+  } finally {
+    $spinner.classList.add("hide");
+  }
 }
 
 function agregarMonstruo(monstruo) {
   const $divCards = document.createElement("div");
-  
+
   const $cardsNombre = document.createElement("p");
   const $cardsAlias = document.createElement("p");
   const $cardsDefensa = document.createElement("p");
@@ -42,13 +43,21 @@ function agregarMonstruo(monstruo) {
   const $txtdefensa = document.createTextNode("Defensa: " + monstruo.defensa);
   const $txtMiedo = document.createTextNode("Miedo: " + monstruo.miedo);
   const $txtTipo = document.createTextNode("Tipo: " + monstruo.tipo);
-  const $txtMaterias = document.createTextNode("materias: " + monstruo.materias);
-
+  const $txtMaterias = document.createTextNode(
+    "materias: " + monstruo.materias
+  );
 
   $divCards.classList.add("Cards");
   $cardsDiv.appendChild($divCards);
 
-  $divCards.append($cardsNombre ,$cardsAlias ,$cardsDefensa ,$cardsMiedo ,$cardsTipo, $cardsMaterias);
+  $divCards.append(
+    $cardsNombre,
+    $cardsAlias,
+    $cardsDefensa,
+    $cardsMiedo,
+    $cardsTipo,
+    $cardsMaterias
+  );
 
   $cardsNombre.appendChild($txtNombre);
   $cardsAlias.appendChild($txtAlias);

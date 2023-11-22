@@ -9,7 +9,7 @@ const tiposArray = [
 ];
 localStorage.setItem("tipos", JSON.stringify(tiposArray));
 
-const $cboTipo = document.getElementById("cboTipo");
+const $cboTipo = document.querySelector("#cboTipo");
 const $cboFiltro = document.querySelector("#cboFiltro");
 const $rdbGroup = document.getElementsByName("defensa");
 const $chkGroup = document.getElementsByName("Materia");
@@ -43,9 +43,10 @@ $btnGuardar.appendChild($btnGuardarText);
 tiposArray.forEach((tipo, index) => {
   const $tipoOpcion = document.createElement("option");
   const $filtroOpcion = document.createElement("option");
+  const $cboFiltroText = document.createTextNode(tipo);
   const $cboTipoText = document.createTextNode(tipo);
 
-  if(index > 0){
+  if (index > 0) {
     $tipoOpcion.setAttribute("value", tipo);
     $tipoOpcion.setAttribute("text", tipo);
     $tipoOpcion.appendChild($cboTipoText);
@@ -54,7 +55,7 @@ tiposArray.forEach((tipo, index) => {
 
   $filtroOpcion.setAttribute("value", tipo);
   $filtroOpcion.setAttribute("text", tipo);
-  $filtroOpcion.appendChild($cboTipoText);
+  $filtroOpcion.appendChild($cboFiltroText);
   $cboFiltro.appendChild($filtroOpcion);
 });
 
@@ -63,24 +64,41 @@ window.onload = () => {
 };
 
 function getMonstruos() {
-  $spinner.classList.remove("hide");
-  axios
-    .get(URLmonstruos)
-    .then(({ data }) => {
-      monstruos = data;
-      if (monstruos.length > 0) {
-        monstruos.forEach((monstruo) => {
-          addRow(monstruo);
-        });
-        calcularPromedioMiedo(monstruos);
-      }
-    })
-    .catch((err) => {
-      console.log(err);
-    })
-    .finally(() => {
+  const xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState == 4) {
       $spinner.classList.add("hide");
-    });
+      if (xhr.status >= 200 && xhr.status < 300) {
+        monstruos = JSON.parse(xhr.responseText);
+        if (monstruos.length > 0) {
+          monstruos.sort((monstruoA, monstruoB) => {
+            if (Number(monstruoA.miedo) < Number(monstruoB.miedo)) {
+              return -1;
+            }
+            if (Number(monstruoA.miedo) > Number(monstruoB.miedo)) {
+              return 1;
+            }
+            return 0;
+          });
+
+          monstruos.forEach((monstruo) => {
+            addRow(monstruo);
+          });
+          calcularPromedioMiedo(monstruos);
+        }
+      } else {
+        console.error(`Error ${xhr.status}: ${xhr.statusText}`);
+      }
+    }
+  };
+  xhr.open("GET", URLmonstruos, true);
+  try {
+    xhr.send();
+  } catch (error) {
+    console.error(err);
+  } finally {
+    $spinner.classList.remove("hide");
+  }
 }
 function postMonstruo() {
   let defensa = getDefensa();
@@ -94,6 +112,7 @@ function postMonstruo() {
     defensa,
     materias
   );
+
   monstruos.forEach((monstruo) => {
     if (
       monstruo.nombre == nuevoMonstruo.nombre &&
@@ -107,20 +126,27 @@ function postMonstruo() {
   });
 
   if (!repetido) {
-    $spinner.classList.remove("hide");
-    axios
-      .post(URLmonstruos, nuevoMonstruo)
-      .then((data) => {
-        addRow(nuevoMonstruo);
-        $PopUp.open = true;
-        $popUpText.textContent = "Monstruo Guardado";
-      })
-      .catch((err) => {
-        console.log(err.message);
-      })
-      .finally(() => {
+    const xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState == 4) {
         $spinner.classList.add("hide");
-      });
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const data = JSON.parse(xhr.responseText);
+        } else {
+          console.error(`Error ${xhr.status}: ${xhr.statusText}`);
+        }
+      }
+    };
+    xhr.open("POST", URLmonstruos, true);
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    try {
+      xhr.send(JSON.stringify(nuevoMonstruo));
+      addRow(nuevoMonstruo);
+    } catch (error) {
+      console.error(err);
+    } finally {
+      $spinner.classList.remove("hide");
+    }
   } else {
     $errorMsgEdicion.classList.remove("hide");
   }
@@ -128,7 +154,6 @@ function postMonstruo() {
 function delMonstruo() {
   let rowNumber;
 
-  $formulario.txtNombre.toggleAttribute("disabled");
   $btnCancelarEdicion.classList.add("hide");
   $btnGuardar.removeChild($btnActualizarText);
   $btnGuardar.appendChild($btnGuardarText);
@@ -142,7 +167,7 @@ function delMonstruo() {
   });
   axios
     .delete(URLmonstruos + "/" + idSeleccionado)
-    .then(({ data }) => {
+    .then((data) => {
       $tablaMonstruos.deleteRow(rowNumber);
       monstruos.splice(rowNumber, 1);
 
@@ -152,6 +177,8 @@ function delMonstruo() {
 
       $PopUp.open = true;
       $popUpText.textContent = "Monstruo Eliminado";
+
+      recargarTabla(monstruos);
     })
     .catch((err) => {
       console.log(err.message);
@@ -163,13 +190,6 @@ function delMonstruo() {
 function putMonstruo() {
   let defensa = getDefensa();
   let materias = getMaterias();
-  let rowNumber;
-
-  monstruos.forEach((monstruo, index) => {
-    if (monstruo.id == idSeleccionado) {
-      rowNumber = index + 1;
-    }
-  });
 
   let monstruoUpdated = new Monstruo(
     $formulario.txtNombre.value,
@@ -183,8 +203,18 @@ function putMonstruo() {
   $spinner.classList.remove("hide");
   axios
     .put(URLmonstruos + "/" + idSeleccionado, monstruoUpdated, Monstruo)
-    .then(({ data }, res) => {
-      addRow(monstruoUpdated, rowNumber);
+    .then(({ data }) => {
+
+      monstruos.forEach((monstruo, index) => {
+        if (monstruo.id == data.id) {
+          monstruos[index] = data;
+        }
+      });
+
+      console.log(monstruos);
+      $PopUp.open = true;
+      $popUpText.textContent = "Monstruo actualizado";
+      recargarTabla(monstruos);
     })
     .catch((err) => {
       console.log(err.message);
@@ -211,9 +241,9 @@ function addRow(monstruo, row = 0) {
   const $txtTipo = document.createTextNode(monstruo.tipo);
   const $txtMaterias = document.createTextNode(monstruo.materias);
 
-  if(row == 0){
+  if (row == 0) {
     $tbody.appendChild($tr);
-  }else{
+  } else {
     $tbody.insertRow(row, $tr);
   }
   $tr.append($tdNombre, $tdAlias, $tdDefensa, $tdMiedo, $tdTipo, $tdMaterias);
@@ -254,16 +284,14 @@ function seleccionarMonstruo(e) {
   $btnGuardar.appendChild($btnActualizarText);
   $btnCancelarEdicion.classList.remove("hide");
 
-  if (!$formulario.txtNombre.hasAttribute("disabled")) {
-    $formulario.txtNombre.toggleAttribute("disabled");
-  }
   $btnEliminar.toggleAttribute("disabled");
 
   $errorMsgIngresos.classList.add("hide");
   $errorMsgEdicion.classList.add("hide");
 
   monstruos.forEach((monstruo) => {
-    if (monstruo.nombre == celdas[0].textContent &&
+    if (
+      monstruo.nombre == celdas[0].textContent &&
       monstruo.alias == celdas[1].textContent &&
       monstruo.defensa == celdas[2].textContent &&
       monstruo.miedo == celdas[3].textContent &&
@@ -312,7 +340,7 @@ $formulario.addEventListener("submit", (e) => {
     } else {
       postMonstruo();
     }
-    if($errorMsgEdicion.classList.contains("hide")){
+    if ($errorMsgEdicion.classList.contains("hide")) {
       $formulario.reset();
     }
   } else {
@@ -344,25 +372,18 @@ function cerrarPopUp() {
   $PopUp.open = false;
 }
 
-function filtrar(){
-  let monstruosFiltrados = monstruos
-  
-  while ($tbody.firstChild) {
-    $tbody.removeChild($tbody.firstChild);
-  }
-
-  if($cboFiltro.value != "Todos"){
-    monstruosFiltrados = monstruos.filter(function(monstruo){
+function filtrar() {
+  let monstruosFiltrados = monstruos;
+  if ($cboFiltro.value != "Todos") {
+    monstruosFiltrados = monstruos.filter(function (monstruo) {
       return monstruo.tipo == $cboFiltro.value;
     });
-  }else{
+  } else {
     monstruosFiltrados = monstruos;
   }
-  monstruosFiltrados.forEach( (monstruo) => {
-    addRow(monstruo);
-  });
+  recargarTabla(monstruosFiltrados);
   calcularPromedioMiedo(monstruosFiltrados);
-  
+
   let columnas = document.querySelectorAll(".filtroCkh");
   columnas.forEach((col, index) => {
     col.checked = true;
@@ -370,16 +391,16 @@ function filtrar(){
   });
 }
 
-function chkColumna(colNum, obj){
+function chkColumna(colNum, obj) {
   let col = getColumn(colNum);
-  
-  if(col != null){
-    if(obj.checked){
-      col.forEach( (columna) => {
+
+  if (col != null) {
+    if (obj.checked) {
+      col.forEach((columna) => {
         columna.classList.remove("hide");
       });
-    }else{
-      col.forEach( (columna) => {
+    } else {
+      col.forEach((columna) => {
         columna.classList.add("hide");
       });
     }
@@ -388,44 +409,56 @@ function chkColumna(colNum, obj){
 
 function getColumn(col) {
   var n = $tablaMonstruos.rows.length;
-  var i, s = null, tr, td;
+  var i,
+    s = null,
+    tr,
+    td;
   let cells = [];
   if (col < 0) {
-      return null;
+    return null;
   }
 
   for (i = 0; i < n; i++) {
-      tr = $tablaMonstruos.rows[i];
-      if (tr.cells.length > col) {
-          td = tr.cells[col];
-          cells.push(td);
-      }
+    tr = $tablaMonstruos.rows[i];
+    if (tr.cells.length > col) {
+      td = tr.cells[col];
+      cells.push(td);
+    }
   }
   return cells;
 }
 
-function calcularPromedioMiedo(monstruos){
+function calcularPromedioMiedo(monstruos) {
   let sumatoriaMiedo = 0;
-  if(monstruos.length > 1){
-    sumatoriaMiedo = monstruos.reduce( (acum, actual, index) => {
+  if (monstruos.length > 1) {
+    sumatoriaMiedo = monstruos.reduce((acum, actual, index) => {
       let sumatoria;
-      if(index == 1){
+      if (index == 1) {
         sumatoria = Number(acum.miedo) + Number(actual.miedo);
-      }else{
+      } else {
         sumatoria = acum + Number(actual.miedo);
       }
       return sumatoria;
     });
-  }else{
-    if(monstruos.length == 1){
+  } else {
+    if (monstruos.length == 1) {
       sumatoriaMiedo = monstruos[0].miedo;
     }
   }
   let prom;
-  if(monstruos.length > 0){
-    prom = sumatoriaMiedo / ($tablaMonstruos.rows.length-1);
-  }else{
+  if (monstruos.length > 0) {
+    prom = sumatoriaMiedo / ($tablaMonstruos.rows.length - 1);
+  } else {
     prom = 0;
   }
   $readOnlyText.value = prom;
+}
+
+function recargarTabla(monstruos) {
+  while ($tbody.firstChild) {
+    $tbody.removeChild($tbody.firstChild);
+  }
+  monstruos.forEach((monstruo) => {
+    addRow(monstruo);
+  });
 }
